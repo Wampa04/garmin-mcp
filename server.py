@@ -55,6 +55,14 @@ mcp.add_middleware(GitHubUserAllowlist(_ALLOWED_USER))
 register_all(mcp)
 
 
+@mcp.custom_route("/health", methods=["GET"], include_in_schema=False)
+async def health(_request):
+    """Unauthenticated liveness probe for the container healthcheck."""
+    from starlette.responses import JSONResponse
+
+    return JSONResponse({"status": "ok"})
+
+
 if __name__ == "__main__":
     mcp.run(
         transport="http",

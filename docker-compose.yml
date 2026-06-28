@@ -9,16 +9,14 @@ services:
       # garth session tokens, generated locally (see README). Read-only.
       - ./tokens:/tokens:ro
     healthcheck:
-      # No curl/wget in the slim image, so probe with Python. Hit the OAuth
-      # metadata endpoint, which returns 200 without auth — this proves the app
-      # is serving (not just uvicorn) and avoids the noisy 401 "Auth error" log
-      # lines that probing /mcp/ would produce. A refused connection counts as
-      # unhealthy.
+      # No curl/wget in the slim image, so probe the dedicated /health route
+      # with Python. It returns 200 without auth, so the logs stay clean. A
+      # non-2xx response or a refused connection counts as unhealthy.
       test:
         - "CMD"
         - "python"
         - "-c"
-        - "import urllib.request,urllib.error,sys;\ntry: urllib.request.urlopen('http://127.0.0.1:8000/.well-known/oauth-authorization-server', timeout=5)\nexcept urllib.error.HTTPError: pass\nexcept Exception: sys.exit(1)"
+        - "import urllib.request,sys;\nsys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).status == 200 else 1)"
       interval: 30s
       timeout: 5s
       start_period: 10s
