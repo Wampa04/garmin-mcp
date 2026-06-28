@@ -8,6 +8,19 @@ services:
     volumes:
       # garth session tokens, generated locally (see README). Read-only.
       - ./tokens:/tokens:ro
+    healthcheck:
+      # No curl/wget in the slim image, so probe with Python. Any HTTP
+      # response (even 401/406) means the server is up; only a refused
+      # connection counts as unhealthy.
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request,urllib.error,sys;\ntry: urllib.request.urlopen('http://127.0.0.1:8000/mcp/', timeout=5)\nexcept urllib.error.HTTPError: pass\nexcept Exception: sys.exit(1)"
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
     networks:
       - proxy
     labels:
