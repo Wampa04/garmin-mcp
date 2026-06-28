@@ -147,6 +147,11 @@ activemq-data/
 # SageMath parsed files
 *.sage.py
 
+# Garmin MCP project
+.idea/
+# Garmin garth session tokens (secrets) — generated locally, mounted into the container
+tokens/
+
 # Environments
 .env
 .envrc
