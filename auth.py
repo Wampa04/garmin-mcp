@@ -22,6 +22,11 @@ class GitHubUserAllowlist(Middleware):
             raise ValueError("ALLOWED_GITHUB_USER must not be empty.")
 
     def _assert_owner(self) -> None:
+        # KNOWN DEBT (security): we match on the GitHub *login*, which is
+        # mutable. If the owner renames their GitHub account, the freed
+        # username could be claimed by someone else who would then pass this
+        # check. Hardening: match on the immutable numeric id (claims["sub"]).
+        # Accepted for now; see README "Security notes".
         token = get_access_token()
         claims = getattr(token, "claims", None) or {}
         login = (claims.get("login") or "").strip().lower()

@@ -38,12 +38,29 @@ _ALLOWED_USER = _require("ALLOWED_GITHUB_USER")
 # Defaults to https://<GARMIN_MCP_DOMAIN>; override with MCP_BASE_URL if needed.
 _BASE_URL = os.environ.get("MCP_BASE_URL") or f"https://{_require('GARMIN_MCP_DOMAIN')}"
 
+# Restrict which client redirect URIs may be registered via dynamic client
+# registration. Without this, ANY client could register an arbitrary redirect
+# URI; if the owner then click-throughs the consent screen, an attacker-
+# registered client could capture an auth code minted for the owner's identity
+# and bypass the allowlist. Default to Claude's callback hosts; override with
+# ALLOWED_CLIENT_REDIRECT_URIS (comma-separated fnmatch patterns) for other
+# clients. Host is matched exactly (or via *.domain), path via fnmatch.
+_DEFAULT_REDIRECT_URIS = "https://claude.ai/*,https://claude.com/*"
+_redirect_uris = [
+    u.strip()
+    for u in os.environ.get(
+        "ALLOWED_CLIENT_REDIRECT_URIS", _DEFAULT_REDIRECT_URIS
+    ).split(",")
+    if u.strip()
+]
+
 # Optional: a stable signing key so tokens issued to Claude survive container
 # restarts (otherwise a new key is generated each start, forcing re-login).
 _provider_kwargs: dict[str, object] = {
     "client_id": _CLIENT_ID,
     "client_secret": _CLIENT_SECRET,
     "base_url": _BASE_URL,
+    "allowed_client_redirect_uris": _redirect_uris,
 }
 if os.environ.get("MCP_JWT_SECRET"):
     _provider_kwargs["jwt_signing_key"] = os.environ["MCP_JWT_SECRET"]

@@ -136,7 +136,18 @@ a `401` with a `WWW-Authenticate` header pointing at the OAuth metadata
   — the allowlist middleware (`auth.py`) fails closed, so anyone else is denied
   even after authenticating with GitHub. Keep `GITHUB_CLIENT_SECRET` and
   `MCP_JWT_SECRET` secret.
+- Client redirect URIs are restricted (default: Claude's hosts) so a stranger
+  cannot register a dynamic client pointing at an attacker-controlled callback.
+  Override via `ALLOWED_CLIENT_REDIRECT_URIS` only if you use a non-Claude client.
 - The `tokens/` directory contains live Garmin session credentials. It is
   mounted read-only into the container and must never be committed or shared.
 - The GitHub OAuth App's callback URL must exactly match
   `https://<your-domain>/auth/callback`, or the login will fail.
+
+### Known security debt
+
+- **Allowlist matches the mutable GitHub username** (`ALLOWED_GITHUB_USER`),
+  not the immutable numeric account id. If you ever rename your GitHub account,
+  someone could claim the freed username and pass the allowlist. Hardening:
+  match on `claims["sub"]` in `auth.py`. Accepted for now (single-user setup,
+  low likelihood). Tracked in the `KNOWN DEBT` comment in `auth.py`.
