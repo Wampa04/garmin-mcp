@@ -9,9 +9,10 @@ services:
       # garth session tokens, generated locally (see README). Read-only.
       - ./tokens:/tokens:ro
     healthcheck:
-      # No curl/wget in the slim image, so probe with Python. Any HTTP
-      # response (even 401/406) means the server is up; only a refused
-      # connection counts as unhealthy.
+      # No curl/wget in the slim image, so probe with Python. Hitting /mcp/
+      # without a token returns 401 — that is still an HTTP response, which
+      # proves the server is up. Only a refused connection (no response)
+      # counts as unhealthy, so the check needs no credentials.
       test:
         - "CMD"
         - "python"

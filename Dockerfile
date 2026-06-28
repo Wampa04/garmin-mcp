@@ -12,7 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Application code.
-COPY garmin_client.py server.py ./
+COPY garmin_client.py auth.py server.py ./
 COPY tools ./tools
 
 # Run as a non-root user; the tokens volume is mounted read-only.
