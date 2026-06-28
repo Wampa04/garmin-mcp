@@ -1,5 +1,7 @@
 # Garmin Connect MCP Server
 
+[![Build and publish image](https://github.com/Wampa04/garmin-mcp/actions/workflows/docker-image.yml/badge.svg)](https://github.com/Wampa04/garmin-mcp/actions/workflows/docker-image.yml)
+
 A self-hosted [MCP](https://modelcontextprotocol.io) server that exposes your
 Garmin Connect data to Claude (Web & Mobile) as a Custom Connector.
 
@@ -70,6 +72,13 @@ Adjust `docker-compose.yml` to match your Traefik install:
 
 - the external `networks:` name (often `proxy`, `web`, or `traefik`),
 - the `entrypoints` and `certresolver` label values.
+
+> **Prefer a prebuilt image?** A GitHub Actions workflow
+> (`.github/workflows/docker-image.yml`) builds and publishes the image to
+> GHCR on every push to `main` and on `v*` tags. To deploy without building on
+> the VPS, replace `build: .` in `docker-compose.yml` with
+> `image: ghcr.io/wampa04/garmin-mcp:latest` and run `docker compose up -d`.
+> (Make the package public, or `docker login ghcr.io` first if it stays private.)
 
 ### 4. Add the connector in Claude
 
