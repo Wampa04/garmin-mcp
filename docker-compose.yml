@@ -1,0 +1,26 @@
+services:
+  garmin-mcp:
+    build: .
+    image: garmin-mcp:latest
+    container_name: garmin-mcp
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      # garth session tokens, generated locally (see README). Read-only.
+      - ./tokens:/tokens:ro
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.garmin-mcp.rule=Host(`${GARMIN_MCP_DOMAIN}`)"
+      - "traefik.http.routers.garmin-mcp.entrypoints=websecure"
+      - "traefik.http.routers.garmin-mcp.tls=true"
+      - "traefik.http.routers.garmin-mcp.tls.certresolver=letsencrypt"
+      - "traefik.http.services.garmin-mcp.loadbalancer.server.port=8000"
+
+networks:
+  # The external network your existing Traefik instance is attached to.
+  # Adjust the name to match your setup (often `proxy`, `web`, or `traefik`).
+  proxy:
+    external: true
