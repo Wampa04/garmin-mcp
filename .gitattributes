@@ -1,0 +1,12 @@
+# Normalize all text files to LF in the repository and on checkout.
+# This project runs in Docker / on a Linux VPS, so LF everywhere avoids
+# CRLF issues (and shebang scripts staying executable as expected).
+* text=auto eol=lf
+
+# Binary types — never normalize or diff as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.gz binary
+*.zip binary
