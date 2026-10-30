@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import io
+import zipfile
+from pathlib import PurePath
 from typing import Any
 
 from fastmcp import FastMCP
@@ -138,12 +141,22 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool
     def download_activity_file(activity_id: int) -> File:
-        """Download the original activity file (a ZIP containing the .FIT file).
+        """Download the original activity file (usually .FIT; GPX/TCX for uploaded activities).
 
         Args:
             activity_id: The Garmin activity id, as returned by `list_activities`.
         """
         data = api_get(f"/download-service/files/activity/{activity_id}", raw=True)
+        # Garmin wraps the original file in a ZIP; unwrap it when it holds just one.
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            entries = [e for e in archive.infolist() if not e.is_dir()]
+            if len(entries) == 1:
+                name = PurePath(entries[0].filename)
+                return File(
+                    data=archive.read(entries[0]),
+                    format=name.suffix.lstrip(".").lower() or None,
+                    name=name.stem,
+                )
         return File(data=data, format="zip", name=f"activity_{activity_id}")
 
     @mcp.tool
