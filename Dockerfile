@@ -2,7 +2,6 @@ FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    GARMINTOKENS=/tokens \
     PORT=8000
 
 WORKDIR /app
@@ -15,7 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY garmin_client.py auth.py server.py ./
 COPY tools ./tools
 
-# Run as a non-root user; the tokens volume is mounted read-only.
+# Run as a non-root user.
 RUN useradd --create-home --uid 1000 appuser
 USER appuser
 

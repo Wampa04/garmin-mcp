@@ -5,30 +5,25 @@ from __future__ import annotations
 from typing import Any
 
 from fastmcp import FastMCP
+from fastmcp.utilities.types import File
 
-from garmin_client import get_client
+from garmin_client import api_get
 
-from ._common import today
+from ._common import day
+
+_SEARCH = "/activitylist-service/activities/search/activities"
 
 
 def register(mcp: FastMCP) -> None:
     @mcp.tool
-    def list_activities(limit: int = 10) -> Any:
+    def list_activities(limit: int = 10, start: int = 0) -> Any:
         """List the most recent Garmin activities (newest first).
 
         Args:
             limit: Maximum number of activities to return.
+            start: Zero-based offset, for paging through older activities.
         """
-        return get_client().get_activities(0, limit)
-
-    @mcp.tool
-    def get_activity_details(activity_id: str) -> Any:
-        """Get full details (splits, metrics, GPS summary) for one activity.
-
-        Args:
-            activity_id: The Garmin activity id, as returned by `list_activities`.
-        """
-        return get_client().get_activity_details(activity_id)
+        return api_get(_SEARCH, {"start": start, "limit": limit})
 
     @mcp.tool
     def list_activities_by_date(
@@ -43,6 +38,124 @@ def register(mcp: FastMCP) -> None:
             end_date: Range end (defaults to today if omitted), format YYYY-MM-DD.
             activity_type: Optional filter, e.g. "running", "cycling", "swimming".
         """
-        return get_client().get_activities_by_date(
-            start_date, end_date or today(), activity_type
+        return api_get(
+            _SEARCH,
+            {
+                "startDate": day(start_date),
+                "endDate": day(end_date),
+                "activityType": activity_type,
+            },
+        )
+
+    @mcp.tool
+    def search_activities(
+        search: str | None = None,
+        activity_type: str | None = None,
+        activity_sub_type: str | None = None,
+        event_type: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        min_distance_m: int | None = None,
+        max_distance_m: int | None = None,
+        min_duration_s: int | None = None,
+        max_duration_s: int | None = None,
+        min_elevation_gain_m: int | None = None,
+        max_elevation_gain_m: int | None = None,
+        min_avg_power_w: int | None = None,
+        favorites_only: bool = False,
+        sort_by: str | None = None,
+        sort_order: str = "desc",
+        limit: int = 20,
+        start: int = 0,
+    ) -> Any:
+        """Search activities by text and filters. All filters are optional and combined.
+
+        Args:
+            search: Text to find in activity names and descriptions.
+            activity_type: Parent type key, e.g. "running", "cycling".
+            activity_sub_type: Subtype key, e.g. "trail_running" (with activity_type "running").
+            event_type: e.g. "race", "training", "recreation", "fitness", "uncategorized".
+            start_date: Earliest start date, format YYYY-MM-DD.
+            end_date: Latest start date, format YYYY-MM-DD.
+            min_distance_m: Minimum distance in meters.
+            max_distance_m: Maximum distance in meters.
+            min_duration_s: Minimum timer duration in seconds.
+            max_duration_s: Maximum timer duration in seconds.
+            min_elevation_gain_m: Minimum total elevation gain in meters.
+            max_elevation_gain_m: Maximum total elevation gain in meters.
+            min_avg_power_w: Minimum average power in watts.
+            favorites_only: Only return activities marked as favorite.
+            sort_by: Field to sort by, e.g. "name", "distance", "duration" (default: start time).
+            sort_order: "asc" or "desc".
+            limit: Maximum number of activities to return.
+            start: Zero-based offset for paging.
+        """
+        return api_get(
+            _SEARCH,
+            {
+                "search": search,
+                "activityType": activity_type,
+                "activitySubType": activity_sub_type,
+                "eventType": event_type,
+                "startDate": day(start_date) if start_date else None,
+                "endDate": day(end_date) if end_date else None,
+                "minDistance": min_distance_m,
+                "maxDistance": max_distance_m,
+                "minDuration": min_duration_s,
+                "maxDuration": max_duration_s,
+                "minElevation": min_elevation_gain_m,
+                "maxElevation": max_elevation_gain_m,
+                "minAvgPower": min_avg_power_w,
+                "favorite": 1 if favorites_only else None,
+                "sortBy": sort_by,
+                "sortOrder": sort_order,
+                "limit": limit,
+                "start": start,
+            },
+        )
+
+    @mcp.tool
+    def get_activity_details(activity_id: int) -> Any:
+        """Get the summary, metrics and splits of one activity.
+
+        Includes per-activity values such as training effect, training load and
+        VO2max. Second-by-second data (GPS track, HR curve) is only in the
+        original file, see `download_activity_file`.
+
+        Args:
+            activity_id: The Garmin activity id, as returned by `list_activities`.
+        """
+        return api_get(f"/activity-service/activity/{activity_id}")
+
+    @mcp.tool
+    def get_activity_workouts(activity_id: int) -> Any:
+        """Get the structured workouts performed during an activity.
+
+        Args:
+            activity_id: The Garmin activity id, as returned by `list_activities`.
+        """
+        return api_get(f"/activity-service/activity/{activity_id}/workouts")
+
+    @mcp.tool
+    def download_activity_file(activity_id: int) -> File:
+        """Download the original activity file (a ZIP containing the .FIT file).
+
+        Args:
+            activity_id: The Garmin activity id, as returned by `list_activities`.
+        """
+        data = api_get(f"/download-service/files/activity/{activity_id}", raw=True)
+        return File(data=data, format="zip", name=f"activity_{activity_id}")
+
+    @mcp.tool
+    def get_wellness_activity_summaries(
+        start_date: str | None = None, end_date: str | None = None
+    ) -> Any:
+        """Get wellness activity summaries for a date range (YYYY-MM-DD).
+
+        Args:
+            start_date: Range start (defaults to today), format YYYY-MM-DD.
+            end_date: Range end (defaults to today), format YYYY-MM-DD.
+        """
+        return api_get(
+            f"/wellnessactivity-service/activity/summary/range/{day(start_date)}/{day(end_date)}"
         )

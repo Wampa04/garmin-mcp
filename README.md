@@ -15,45 +15,48 @@ with GitHub — there is no token or client secret to enter in Claude. A
 middleware then restricts access to a **single GitHub user** (`ALLOWED_GITHUB_USER`),
 so even though anyone could log in with GitHub, only you can reach the data.
 
-**Garmin authentication** uses **token-resume**: you log in once locally (MFA
-handled interactively) and mount the resulting session tokens into the
-container — the server never logs in with your password, which avoids the
-captcha/MFA blocks Garmin applies to datacenter IPs.
+**Garmin access** uses the official
+[Garmin Connect Personal API](https://developer.garmin.com/gc-developer-program/personal/personal-api/):
+you create a Personal API key in Garmin Connect Web and put it in `.env`. The
+server exchanges it for a 24-hour access token and renews that automatically —
+no password, no MFA, no session tokens to copy around.
 
 Built with [`fastmcp`](https://github.com/jlowin/fastmcp) and
-[`garminconnect`](https://github.com/cyberjunky/python-garminconnect).
+[`httpx`](https://www.python-httpx.org/).
 Requires Python 3.14.
 
-## Tools (17)
+## Tools (30)
 
 | Area | Tools |
 |------|-------|
-| Activities | `list_activities`, `get_activity_details`, `list_activities_by_date` |
-| Sleep / recovery | `get_sleep`, `get_body_battery`, `get_hrv` |
-| Training | `get_training_status`, `get_training_readiness`, `get_training_load`, `get_vo2max` |
-| Heart rate / stress | `get_heart_rate`, `get_resting_heart_rate`, `get_stress` |
-| Daily / records | `get_daily_summary`, `get_steps`, `get_floors`, `get_personal_records` |
+| Activities | `list_activities`, `list_activities_by_date`, `search_activities`, `get_activity_details`, `get_activity_workouts`, `download_activity_file`, `get_wellness_activity_summaries` |
+| Sleep / recovery | `get_sleep`, `get_sleep_summaries`, `get_body_battery`, `get_hrv`, `get_hrv_summaries`, `get_spo2` |
+| Heart rate / stress | `get_heart_rate`, `get_resting_heart_rate`, `get_heart_rate_zones`, `get_stress` |
+| Daily | `get_daily_summary`, `get_daily_summaries`, `get_steps`, `get_floors`, `get_hydration` |
+| Body / profile | `get_fitness_age`, `get_weight`, `get_weight_entries`, `get_weight_goals`, `get_nutrition_log`, `get_menstrual_cycle_summary`, `get_menstrual_cycle_day`, `get_user_settings` |
 
 Date arguments use the format `YYYY-MM-DD` and default to today when omitted.
+Range tools are limited by Garmin (steps/stress 28 days, sleep/Body
+Battery/hydration 31 days, daily summaries 1 year).
+
+**Not available in the Personal API:** training status, training readiness,
+training load (acute/chronic), daily VO2max and personal records. Per-activity
+training effect, training load and VO2max are included in
+`get_activity_details`.
 
 ## Setup
 
-### 1. Generate Garmin tokens (locally, once)
+### 1. Create a Garmin Personal API key
 
-On your own machine (where you can complete MFA):
+In [Garmin Connect Web](https://connect.garmin.com/app/settings/personalApiToken)
+→ Settings → **Personal API Key** → *Create Key*, accept the terms and choose
+an expiration (30 days to 1 year). The key is shown **only once** — copy it
+into `.env` as `GARMIN_API_KEY` (step 3).
 
-```bash
-python -m venv .venv && . .venv/Scripts/activate   # Windows
-# python3 -m venv .venv && source .venv/bin/activate  # Linux/macOS
-pip install -r requirements.txt
-python scripts/generate_tokens.py
-```
+Garmin emails you about a week before the key expires; then create a new key,
+update `.env` and restart the container.
 
-This logs in to Garmin and writes session tokens to `./tokens/`. The tokens
-auto-refresh, so this step is normally only needed once (re-run it if the
-server later reports the tokens are invalid).
-
-> `tokens/` and `.env` are git-ignored — never commit them.
+> `.env` is git-ignored — never commit it.
 
 ### 2. Create a GitHub OAuth App
 
@@ -75,13 +78,14 @@ Edit `.env`:
 - `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` — from the OAuth App above.
 - `ALLOWED_GITHUB_USER` — your GitHub username; only this account may connect.
 - `GARMIN_MCP_DOMAIN` — the domain Traefik routes to this service.
+- `GARMIN_API_KEY` — the Personal API key from step 1.
 - `MCP_JWT_SECRET` *(optional)* — `openssl rand -hex 32`; set it so tokens
   issued to Claude survive container restarts (otherwise a restart forces a
   re-login).
 
 ### 4. Deploy on the VPS
 
-Copy the project (including your `tokens/` directory and `.env`) to the server,
+Copy the project (including your `.env`) to the server,
 then:
 
 ```bash
@@ -120,10 +124,9 @@ deployed. To smoke-test wiring locally you can still boot the server with
 placeholder credentials:
 
 ```bash
-# tokens/ must already exist (see step 1)
 GITHUB_CLIENT_ID=x GITHUB_CLIENT_SECRET=y ALLOWED_GITHUB_USER=you \
 GARMIN_MCP_DOMAIN=localhost:8000 MCP_BASE_URL=http://localhost:8000 \
-GARMINTOKENS=./tokens python server.py
+GARMIN_API_KEY=<your-key> python server.py
 ```
 
 The server listens on `http://0.0.0.0:8000/mcp/`; unauthenticated requests get
@@ -139,8 +142,9 @@ a `401` with a `WWW-Authenticate` header pointing at the OAuth metadata
 - Client redirect URIs are restricted (default: Claude's hosts) so a stranger
   cannot register a dynamic client pointing at an attacker-controlled callback.
   Override via `ALLOWED_CLIENT_REDIRECT_URIS` only if you use a non-Claude client.
-- The `tokens/` directory contains live Garmin session credentials. It is
-  mounted read-only into the container and must never be committed or shared.
+- `GARMIN_API_KEY` grants read access to all your Garmin data until it
+  expires. Keep it secret; if it leaks, delete it in Garmin Connect Web, which
+  also invalidates every access token issued from it.
 - The GitHub OAuth App's callback URL must exactly match
   `https://<your-domain>/auth/callback`, or the login will fail.
 

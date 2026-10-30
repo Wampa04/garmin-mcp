@@ -5,9 +5,6 @@ services:
     container_name: garmin-mcp
     restart: unless-stopped
     env_file: .env
-    volumes:
-      # garth session tokens, generated locally (see README). Read-only.
-      - ./tokens:/tokens:ro
     healthcheck:
       # No curl/wget in the slim image, so probe the dedicated /health route
       # with Python. It returns 200 without auth, so the logs stay clean. A

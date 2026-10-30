@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from fastmcp import FastMCP
 
-from . import activities, daily, heart, recovery, training
+from . import activities, body, daily, heart, recovery
 
-_MODULES = (activities, recovery, training, heart, daily)
+_MODULES = (activities, recovery, heart, daily, body)
 
 
 def register_all(mcp: FastMCP) -> None:

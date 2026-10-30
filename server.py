@@ -1,7 +1,7 @@
 """Garmin Connect MCP server.
 
-Exposes 17 read-only tools over Garmin Connect data via the MCP HTTP
-transport. Designed to run as a Docker container behind Traefik and be added
+Exposes 30 read-only tools over the Garmin Connect Personal API via the MCP
+HTTP transport. Designed to run as a Docker container behind Traefik and be added
 as a Custom Connector in Claude.
 
 Access is protected by **GitHub OAuth**: Claude runs the OAuth 2.1 flow
