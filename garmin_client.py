@@ -1,64 +1,92 @@
-"""Garmin Connect client wrapper.
+"""Garmin Connect Personal API client.
 
-Uses token-resume authentication only: the garth session tokens must be
-generated once locally (interactive, handles MFA) via
-``scripts/generate_tokens.py`` and mounted into the container at the path
-given by the ``GARMINTOKENS`` environment variable.
+Authenticates with a Personal API key (created in Garmin Connect Web under
+Settings -> Personal API Key) given in the ``GARMIN_API_KEY`` environment
+variable. The key is exchanged for an access token that is valid for 24 hours;
+there are no refresh tokens, so a new token is simply requested from the key
+before the old one expires (or when Garmin rejects it).
 
-The container never logs in with email/password, which avoids the
-captcha/MFA blocks Garmin applies to logins from datacenter IPs.
+API reference: https://developer.garmin.com/gc-developer-program/personal/swagger-docs/
 """
 
 from __future__ import annotations
 
 import os
 import threading
+import time
+from typing import Any
 
-from garminconnect import Garmin
+import httpx
 
-# Default matches the read-only volume mount in docker-compose.yml.
-_TOKENSTORE = os.environ.get("GARMINTOKENS", "/tokens")
+_BASE_URL = "https://personal.connectapi.garmin.com"
+_TOKEN_PATH = "/personalapitoken-service/personal-api/personal-api-key/token"
+# Tokens live 24h; renew an hour early so a request never races the expiry.
+_TOKEN_MAX_AGE = 23 * 3600
 
-_client: Garmin | None = None
+_http = httpx.Client(base_url=_BASE_URL, timeout=30)
 _lock = threading.Lock()
+_token: str | None = None
+_token_issued = 0.0
 
 
 class GarminAuthError(RuntimeError):
-    """Raised when the stored garth tokens are missing or invalid."""
+    """Raised when the Personal API key is missing, invalid or expired."""
 
 
-def get_client() -> Garmin:
-    """Return a logged-in Garmin client, creating it on first use.
+def _fetch_token() -> str:
+    key = os.environ.get("GARMIN_API_KEY")
+    if not key:
+        raise GarminAuthError(
+            "GARMIN_API_KEY is not set. Create a Personal API key in Garmin Connect "
+            "Web (Settings -> Personal API Key) and add it to .env (see README)."
+        )
+    resp = _http.post(_TOKEN_PATH, headers={"Authorization": f"ApiKey {key}"})
+    if resp.status_code in (401, 403):
+        raise GarminAuthError(
+            f"Garmin rejected the Personal API key (HTTP {resp.status_code}). It may "
+            "have expired or been deleted; create a new one in Garmin Connect Web."
+        )
+    resp.raise_for_status()
+    # shortcut: the token response schema is undocumented, so accept the usual
+    # field names or a plain-text body; pin it once verified against a real key.
+    try:
+        body = resp.json()
+    except ValueError:
+        token = resp.text.strip()
+    else:
+        token = (
+            (body.get("access_token") or body.get("accessToken"))
+            if isinstance(body, dict)
+            else body if isinstance(body, str) else None
+        )
+        if not token:
+            fields = sorted(body) if isinstance(body, dict) else type(body).__name__
+            raise GarminAuthError(f"Unexpected token response from Garmin: {fields}")
+    return token
 
-    The client is a process-wide singleton; garth refreshes the session
-    tokens automatically before each request, so a single login is enough
-    for the lifetime of the process. Guarded by a lock so concurrent MCP
-    requests do not trigger a duplicate login.
-    """
-    global _client
-    if _client is not None:
-        return _client
 
+def _get_token(renew: bool = False) -> str:
+    global _token, _token_issued
     with _lock:
-        if _client is not None:  # another thread won the race
-            return _client
+        if renew or _token is None or time.monotonic() - _token_issued > _TOKEN_MAX_AGE:
+            _token = _fetch_token()
+            _token_issued = time.monotonic()
+        return _token
 
-        if not os.path.isdir(_TOKENSTORE) or not os.listdir(_TOKENSTORE):
-            raise GarminAuthError(
-                f"No Garmin tokens found in '{_TOKENSTORE}'. Generate them locally "
-                "with `python scripts/generate_tokens.py` and mount the resulting "
-                "directory into the container (see README)."
-            )
 
-        client = Garmin()
-        try:
-            client.login(_TOKENSTORE)
-        except Exception as exc:  # noqa: BLE001 - surface a clear, actionable message
-            raise GarminAuthError(
-                f"Could not log in to Garmin using tokens in '{_TOKENSTORE}': {exc}. "
-                "The tokens may have expired; regenerate them with "
-                "`python scripts/generate_tokens.py`."
-            ) from exc
+def api_get(path: str, params: dict[str, Any] | None = None, *, raw: bool = False) -> Any:
+    """GET a Personal API endpoint and return the decoded JSON (or bytes if ``raw``).
 
-        _client = client
-        return _client
+    ``None`` values in ``params`` are dropped so tools can pass optional filters
+    straight through. Returns ``None`` for an empty response (e.g. HTTP 204).
+    """
+    params = {k: v for k, v in (params or {}).items() if v is not None}
+    resp = _http.get(path, params=params, headers={"Authorization": f"Bearer {_get_token()}"})
+    if resp.status_code == 401:  # token revoked or expired early: renew once and retry
+        resp = _http.get(
+            path, params=params, headers={"Authorization": f"Bearer {_get_token(renew=True)}"}
+        )
+    resp.raise_for_status()
+    if raw:
+        return resp.content
+    return resp.json() if resp.content else None
