@@ -2,6 +2,7 @@ FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    TZ=Europe/Berlin \
     PORT=8000
 
 WORKDIR /app

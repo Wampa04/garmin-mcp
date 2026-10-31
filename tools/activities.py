@@ -22,33 +22,13 @@ def register(mcp: FastMCP) -> None:
     def list_activities(limit: int = 10, start: int = 0) -> Any:
         """List the most recent Garmin activities (newest first).
 
+        Each activity includes VO2max, training effect and training load.
+
         Args:
             limit: Maximum number of activities to return.
             start: Zero-based offset, for paging through older activities.
         """
         return api_get(_SEARCH, {"start": start, "limit": limit})
-
-    @mcp.tool
-    def list_activities_by_date(
-        start_date: str,
-        end_date: str | None = None,
-        activity_type: str | None = None,
-    ) -> Any:
-        """List activities within a date range (YYYY-MM-DD).
-
-        Args:
-            start_date: Range start, format YYYY-MM-DD.
-            end_date: Range end (defaults to today if omitted), format YYYY-MM-DD.
-            activity_type: Optional filter, e.g. "running", "cycling", "swimming".
-        """
-        return api_get(
-            _SEARCH,
-            {
-                "startDate": day(start_date),
-                "endDate": day(end_date),
-                "activityType": activity_type,
-            },
-        )
 
     @mcp.tool
     def search_activities(
@@ -72,6 +52,8 @@ def register(mcp: FastMCP) -> None:
         start: int = 0,
     ) -> Any:
         """Search activities by text and filters. All filters are optional and combined.
+
+        Each activity includes VO2max, training effect and training load.
 
         Args:
             search: Text to find in activity names and descriptions.
@@ -121,9 +103,9 @@ def register(mcp: FastMCP) -> None:
     def get_activity_details(activity_id: int) -> Any:
         """Get the summary, metrics and splits of one activity.
 
-        Includes per-activity values such as training effect, training load and
-        VO2max. Second-by-second data (GPS track, HR curve) is only in the
-        original file, see `download_activity_file`.
+        Includes training effect and training load (VO2max is in
+        `list_activities` / `search_activities`). Second-by-second data (GPS
+        track, HR curve) is only in the original file, see `download_activity_file`.
 
         Args:
             activity_id: The Garmin activity id, as returned by `list_activities`.

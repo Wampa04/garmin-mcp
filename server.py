@@ -1,6 +1,6 @@
 """Garmin Connect MCP server.
 
-Exposes 30 read-only tools over the Garmin Connect Personal API via the MCP
+Exposes 29 read-only tools over the Garmin Connect Personal API via the MCP
 HTTP transport. Designed to run as a Docker container behind Traefik and be added
 as a Custom Connector in Claude.
 
@@ -34,6 +34,7 @@ def _require(name: str) -> str:
 _CLIENT_ID = _require("GITHUB_CLIENT_ID")
 _CLIENT_SECRET = _require("GITHUB_CLIENT_SECRET")
 _ALLOWED_USER = _require("ALLOWED_GITHUB_USER")
+_require("GARMIN_API_KEY")  # read by garmin_client; checked here so a missing key fails at startup
 # Public base URL where OAuth endpoints live (e.g. https://garmin-mcp.example.de).
 # Defaults to https://<GARMIN_MCP_DOMAIN>; override with MCP_BASE_URL if needed.
 _BASE_URL = os.environ.get("MCP_BASE_URL") or f"https://{_require('GARMIN_MCP_DOMAIN')}"

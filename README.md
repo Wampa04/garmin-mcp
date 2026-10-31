@@ -25,24 +25,25 @@ Built with [`fastmcp`](https://github.com/jlowin/fastmcp) and
 [`httpx`](https://www.python-httpx.org/).
 Requires Python 3.14.
 
-## Tools (30)
+## Tools (29)
 
 | Area | Tools |
 |------|-------|
-| Activities | `list_activities`, `list_activities_by_date`, `search_activities`, `get_activity_details`, `get_activity_workouts`, `download_activity_file`, `get_wellness_activity_summaries` |
+| Activities | `list_activities`, `search_activities`, `get_activity_details`, `get_activity_workouts`, `download_activity_file`, `get_wellness_activity_summaries` |
 | Sleep / recovery | `get_sleep`, `get_sleep_summaries`, `get_body_battery`, `get_hrv`, `get_hrv_summaries`, `get_spo2` |
 | Heart rate / stress | `get_heart_rate`, `get_resting_heart_rate`, `get_heart_rate_zones`, `get_stress` |
 | Daily | `get_daily_summary`, `get_daily_summaries`, `get_steps`, `get_floors`, `get_hydration` |
 | Body / profile | `get_fitness_age`, `get_weight`, `get_weight_entries`, `get_weight_goals`, `get_nutrition_log`, `get_menstrual_cycle_summary`, `get_menstrual_cycle_day`, `get_user_settings` |
 
-Date arguments use the format `YYYY-MM-DD` and default to today when omitted.
+Date arguments use the format `YYYY-MM-DD` and default to today when omitted
+("today" in `TZ`, default `Europe/Berlin`; override it in `.env`).
 Range tools are limited by Garmin (steps/stress 28 days, sleep/Body
 Battery/hydration 31 days, daily summaries 1 year).
 
 **Not available in the Personal API:** training status, training readiness,
 training load (acute/chronic), daily VO2max and personal records. Per-activity
-training effect, training load and VO2max are included in
-`get_activity_details`.
+VO2max, training effect and training load are included in the results of
+`list_activities` and `search_activities`.
 
 ## Setup
 
